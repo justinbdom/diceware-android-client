@@ -4,6 +4,7 @@
 
   <uses-permission android:name="android.permission.INTERNET"/>
 
+  <!-- FIXME Re-enable allowBackup before shipping. -->
   <application
     android:name=".DicewareApplication"
     android:allowBackup="false"
