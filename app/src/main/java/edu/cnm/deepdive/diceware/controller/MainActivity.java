@@ -3,27 +3,25 @@ package edu.cnm.deepdive.diceware.controller;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
-import android.widget.ProgressBar;
-import android.widget.Toast;
-import androidx.lifecycle.ViewModelProviders;
-import androidx.recyclerview.widget.RecyclerView;
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
-import com.google.android.material.snackbar.Snackbar;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.Toolbar;
-import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
+import android.widget.ProgressBar;
+import android.widget.Toast;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
+import androidx.lifecycle.ViewModelProviders;
+import androidx.recyclerview.widget.RecyclerView;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.snackbar.Snackbar;
 import edu.cnm.deepdive.diceware.R;
-import edu.cnm.deepdive.diceware.service.DicewareService;
+import edu.cnm.deepdive.diceware.model.Passphrase;
 import edu.cnm.deepdive.diceware.service.GoogleSignInService;
 import edu.cnm.deepdive.diceware.view.PassphraseAdapter;
 import edu.cnm.deepdive.diceware.viewmodel.MainViewModel;
-import io.reactivex.android.schedulers.AndroidSchedulers;
-import io.reactivex.schedulers.Schedulers;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity
+    implements PassphraseFragment.OnCompleteListener {
 
   private ProgressBar waiting;
   private RecyclerView passphraseList;
@@ -38,13 +36,38 @@ public class MainActivity extends AppCompatActivity {
     setupSignIn();
   }
 
+  @Override
+  public boolean onCreateOptionsMenu(Menu menu) {
+    getMenuInflater().inflate(R.menu.menu_main, menu);
+    return true;
+  }
+
+  @Override
+  public boolean onOptionsItemSelected(MenuItem item) {
+    boolean handled = true;
+    switch (item.getItemId()) {
+      case R.id.refresh:
+        refreshSignIn(() -> viewModel.refreshPassphrases());
+        break;
+      case R.id.action_settings:
+        break;
+      case R.id.sign_out:
+        signOut();
+        break;
+      default:
+        handled = super.onOptionsItemSelected(item);
+    }
+    return handled;
+  }
+
   private void setupViewModel() {
     viewModel = ViewModelProviders.of(this).get(MainViewModel.class);
     viewModel.getPassphrases().observe(this, (passphrases) -> {
       PassphraseAdapter adapter = new PassphraseAdapter(this, passphrases,
           (view, position, passphrase) -> {
-            // TODO Add code to pop up editor.
             Log.d("Passphrase click", passphrase.getKey());
+            PassphraseFragment fragment = PassphraseFragment.newInstance(passphrase);
+            fragment.show(getSupportFragmentManager(), fragment.getClass().getSimpleName());
           },
           (menu, position, passphrase) -> {
             Log.d("Passphrase context", passphrase.getKey());
@@ -81,39 +104,12 @@ public class MainActivity extends AppCompatActivity {
     Toolbar toolbar = findViewById(R.id.toolbar);
     setSupportActionBar(toolbar);
     FloatingActionButton fab = findViewById(R.id.fab);
-    fab.setOnClickListener(new View.OnClickListener() {
-      @Override
-      public void onClick(View view) {
-        Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-            .setAction("Action", null).show();
-      }
+    fab.setOnClickListener(view -> {
+      PassphraseFragment fragment = PassphraseFragment.newInstance();
+      fragment.show(getSupportFragmentManager(), fragment.getClass().getSimpleName());
     });
     waiting = findViewById(R.id.waiting);
     passphraseList = findViewById(R.id.keyword_list);
-  }
-
-  @Override
-  public boolean onCreateOptionsMenu(Menu menu) {
-    getMenuInflater().inflate(R.menu.menu_main, menu);
-    return true;
-  }
-
-  @Override
-  public boolean onOptionsItemSelected(MenuItem item) {
-    boolean handled = true;
-    switch (item.getItemId()) {
-      case R.id.refresh:
-        refreshSignIn(() -> viewModel.refreshPassphrases());
-        break;
-      case R.id.action_settings:
-        break;
-      case R.id.sign_out:
-        signOut();
-        break;
-      default:
-        handled = super.onOptionsItemSelected(item);
-    }
-    return handled;
   }
 
   private void signOut() {
@@ -129,6 +125,16 @@ public class MainActivity extends AppCompatActivity {
     signInService.refresh()
         .addOnSuccessListener((account) -> runnable.run())
         .addOnFailureListener((e) -> signOut());
+  }
+
+  @Override
+  public void complete(Passphrase passphrase) {
+    waiting.setVisibility(View.VISIBLE);
+    if (passphrase.getId() == 0) {
+      viewModel.addPassphrase(passphrase);
+    } else {
+      viewModel.updatePassphrase(passphrase);
+    }
   }
 
 }
